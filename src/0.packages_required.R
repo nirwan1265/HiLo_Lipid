@@ -45,4 +45,6 @@ library(dplyr)
 library(ggstatsplot)
 library(vcfR)
 library(leaflet)
-
+library(caret)
+library(FactoMineR)
+library(factoextra)

@@ -14,6 +14,9 @@ hilo_lipids <- hilo_lipids %>%
   filter(n() > 1) %>%
   ungroup()
 
+
+head(hilo_lipids)
+
 # Separate highland and lowland
 highland <- hilo_lipids[which(hilo_lipids$elevation == "High"), ]
 lowland <- hilo_lipids[which(hilo_lipids$elevation == "Low"), ]
@@ -33,19 +36,22 @@ lowland_all <- rbind(highland_low,lowland_low)
 # Add the long and lat 
 highland_all <- dplyr::left_join(highland_all,info, by =c("genotype" = "ID"))
 lowland_all <- dplyr::left_join(lowland_all,info, by =c("genotype" = "ID"))
-
+hilo_lipids_all <- dplyr::left_join(hilo_lipids,info, by =c("genotype" = "ID"))
 
 # Drop rows with NA in LOng ana Lat
 highland_all <- highland_all %>% drop_na(Long)
 lowland_all <- lowland_all %>% drop_na(Long)
+hilo_lipids_all <- hilo_lipids_all %>% drop_na(Long)
 
 # Create a SpatialPointsDataFrame from your data
 sp::coordinates(highland_all) <- ~Long+Lat
 sp::coordinates(lowland_all) <- ~Long+Lat
+sp::coordinates(hilo_lipids_all) <- ~Long+Lat
 
 #Setting CRS and Extracting Values for All .tif Files
 proj4string(highland_all) <- CRS(SRS_string = "EPSG:4326")
 proj4string(lowland_all) <- CRS(SRS_string = "EPSG:4326")
+proj4string(hilo_lipids_all) <- CRS(SRS_string = "EPSG:4326")
 
 # Define the directory containing your .tif files
 dir_path <- "/Users/nirwantandukar/Documents/Research/data/HiLo_lipids/predictors"
@@ -67,27 +73,37 @@ for (tif_path in tif_files) {
   highland_all[[col_name]] <- values
 }
 
+
 for (tif_path in tif_files) {
   values <- extract_values(tif_path, lowland_all)
   col_name <- gsub("^.+/(.+).tif$", "\\1", tif_path) # Create a column name based on the .tif file name
   lowland_all[[col_name]] <- values
 }
-
+for (tif_path in tif_files) {
+  values <- extract_values(tif_path, hilo_lipids_all)
+  col_name <- gsub("^.+/(.+).tif$", "\\1", tif_path) # Create a column name based on the .tif file name
+  hilo_lipids_all[[col_name]] <- values
+}
 
 highland_all <- highland_all@data
 lowland_all <- lowland_all@data
-
+hilo_lipids_all <- hilo_lipids_all@data
 
 # predictors
 predictors_highland <- highland_all %>% dplyr::select(c(elevation,AM_herbs_roots_colonized:`wc2.1_30s_wind_12`))
 predictors_lowland <- lowland_all %>% dplyr::select(c(elevation,AM_herbs_roots_colonized:`wc2.1_30s_wind_12`))
+predictors_hilo_lipids_all <- hilo_lipids_all %>% dplyr::select(c(elevation,AM_herbs_roots_colonized:`wc2.1_30s_wind_12`))
+
 
 # Getting PC's and LPC's
 PC_highland <- highland_all[grepl("^PC",names(highland_all))]
 LPC_highland <- highland_all[grepl("LPC",names(highland_all))]
+LPC_hilo_lipids_all <- hilo_lipids_all[grepl("LPC",names(hilo_lipids_all))]
 
 PC_lowland <- lowland_all[grepl("^PC",names(lowland_all))]
 LPC_lowland <- lowland_all[grepl("LPC",names(lowland_all))]
+PC_hilo_lipids_all <- hilo_lipids_all[grepl("PC",names(hilo_lipids_all))]
+
 
 # Summing up all the PC's and LPC's
 PC_sum_highland <- rowSums(PC_highland, na.rm = T)
@@ -96,13 +112,22 @@ LPC_sum_highland <- rowSums(LPC_highland, na.rm = T)
 PC_sum_lowland <- rowSums(PC_lowland, na.rm = T)
 LPC_sum_lowland <- rowSums(LPC_lowland, na.rm = T)
 
+LPC_sum_hilo_lipids_all <- rowSums(LPC_hilo_lipids_all, na.rm = T)
+PC_sum_hilo_lipids_all <- rowSums(PC_hilo_lipids_all, na.rm = T)
+
 
 # Taking Ratios
 PC_LPC_sum_highland <- PC_sum_highland/LPC_sum_highland
 PC_LPC_sum_lowland <- PC_sum_lowland/LPC_sum_lowland
 
+
+PC_LPC_sum_hilo_lipids_all <- PC_sum_hilo_lipids_all/LPC_sum_hilo_lipids_all
+
+
 PC_LPC_16_32_highland <- PC_highland$PC_32_0/LPC_highland$LPC_16_0
 PC_LPC_16_32_lowland <- PC_lowland$PC_32_0/LPC_lowland$LPC_16_0
+
+
 
 # Getting the training data
 # PC/LPC is the response variable
@@ -116,11 +141,18 @@ y_lowland <- log10(PC_LPC_16_32_lowland)
 y_lowland <- log10(PC_LPC_sum_lowland)
 X_lowland <- predictors_lowland
 
+# all
+y_all <- log10(PC_LPC_sum_hilo_lipids_all)
+X_all <- predictors_hilo_lipids_all
+
 train_data_highland <- X_highland
 train_y_highland <- y_highland
 
 train_data_lowland <- X_lowland
 train_y_lowland <- y_lowland
+
+train_data_highland <- X_all
+train_y_highland <- y_all
 
 
 # Factorizing
